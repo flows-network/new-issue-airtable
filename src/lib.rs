@@ -9,7 +9,7 @@ use tokio::spawn;
 #[tokio::main(flavor = "current_thread")]
 pub async fn run() {
     schedule_cron_job(
-        String::from("30 1 * * *"),
+        String::from("30 @hourly * * *"),
         String::from("cron_job_evoked"),
         |body| {
             spawn(async {
@@ -18,7 +18,7 @@ pub async fn run() {
                 let base_id: &str = "apptJFYvsGrrywvWh";
                 let table_name: &str = "users";
 
-                let octo = get_octo(Some(String::from(login)));
+                let octocrab = get_octo(Some(String::from(login)));
 
                 let pages = octocrab::instance()
                     .search()
