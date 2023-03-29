@@ -10,7 +10,7 @@ use store_flows::{global_get, global_set};
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("15 * * * *"),
+        String::from("38 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -36,13 +36,15 @@ fn callback(_body: Vec<u8>) {
                 Err(_e) => {}
 
                 Ok(response) => {
-                    let time_entries_last_saved: DateTime<Utc> =
-                        global_get("time_entries_last_saved")
+                    let time_entries_last_saved: Option<DateTime<Utc>> =
+                        match global_get("time_entries_last_saved")
                             .unwrap()
                             .to_string()
                             .parse()
-                            .expect("Invalid date-time format");
-                    send_message_to_channel("ik8", "ch_in", time_entries_last_saved.to_string());
+                        {
+                            Ok(t) => Some(t),
+                            Err(_) => None,
+                        };
                     for item in response.items {
                         let name = item.user.login;
                         let title = item.title;
@@ -50,7 +52,10 @@ fn callback(_body: Vec<u8>) {
                         let html_url = item.html_url;
                         let time = item.created_at;
 
-                        if time > time_entries_last_saved {
+                        if time_entries_last_saved.is_none()
+                            || time_entries_last_saved.is_some()
+                                && time > time_entries_last_saved.unwrap()
+                        {
                             let text = format!(
                                 "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
                             );
@@ -62,9 +67,9 @@ fn callback(_body: Vec<u8>) {
                                 "Created": time,
                             });
                             create_record(account, base_id, table_name, data.clone());
-                            let time: Value =
+                            let time_serialized: Value =
                                 serde_json::to_value(&time).expect("Failed to serialize date-time");
-                            global_set("time_entries_last_saved", time);
+                            global_set("time_entries_last_saved", time_serialized);
                             send_message_to_channel("ik8", "ch_out", data.to_string());
                         }
                         send_message_to_channel("ik8", "ch_mid", time.to_string());
@@ -85,7 +90,7 @@ struct Issue {
     html_url: String,
     title: String,
     user: User,
-    created_at: DateTime<Utc>,
+    created_at: DateTime::<Utc>,
 }
 
 #[derive(Debug, Deserialize)]
