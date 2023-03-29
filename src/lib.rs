@@ -13,7 +13,7 @@ use slack_flows::send_message_to_channel;
 #[tokio::main(flavor = "current_thread")]
 pub async fn run() {
     schedule_cron_job(
-        String::from("25 * * * *"),
+        String::from("8 * * * *"),
         String::from("cron_job_evoked"),
         Box::new(|body: Vec<u8>| {
             Box::pin(async move {
