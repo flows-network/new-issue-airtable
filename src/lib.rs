@@ -43,6 +43,7 @@ async fn handler(login: &str, owner: &str, repo: &str, payload: EventPayload) {
             for item in response.items {
                 let name = item.user.login;
                 let title = item.title;
+                send_message_to_channel("ik8", "general", title.to_string());
                 let html_url = item.html_url;
                 let time = item.created_at;
 
