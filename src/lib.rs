@@ -1,5 +1,5 @@
 use airtable_flows::create_record;
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -8,12 +8,12 @@ use schedule_flows::schedule_cron_job;
 use serde::Deserialize;
 use serde_json::Value;
 use slack_flows::send_message_to_channel;
-use store_flows::{global_get, global_set};
+use store_flows::{set, get};
 
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("40 * * * *"),
+        String::from("50 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -58,8 +58,8 @@ fn callback(_body: Vec<u8>) {
                 }
 
                 Ok(search_result) => {
-                    let time_entries_last_saved = global_get("time_entries_last_saved")
-                        .unwrap().to_string();
+                    let time_entries_last_saved = get("time_entries_last_saved")
+                        .unwrap_or_default().to_string();
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
@@ -85,7 +85,7 @@ fn callback(_body: Vec<u8>) {
                             create_record(account, base_id, table_name, data.clone());
                             
                             let time_value: Value = serde_json::json!(time);
-                            global_set("time_entries_last_saved", time_value);
+                            set("time_entries_last_saved", time_value);
                             send_message_to_channel("ik8", "ch_out", data.to_string());
                         }
                         send_message_to_channel("ik8", "ch_mid", time.to_string());
