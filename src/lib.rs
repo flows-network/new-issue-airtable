@@ -1,5 +1,5 @@
 use airtable_flows::create_record;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -13,7 +13,7 @@ use store_flows::{global_get, global_set};
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("12 * * * *"),
+        String::from("40 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -58,8 +58,8 @@ fn callback(_body: Vec<u8>) {
                 }
 
                 Ok(search_result) => {
-                    let time_entries_last_saved =
-                        global_get("time_entries_last_saved").unwrap().as_i64();
+                    let time_entries_last_saved = global_get("time_entries_last_saved")
+                        .unwrap().to_string();
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
@@ -67,16 +67,13 @@ fn callback(_body: Vec<u8>) {
                         let html_url = item.html_url;
                         let time = item.created_at;
 
-                        if time_entries_last_saved.is_none()
-                            || time_entries_last_saved.is_some()
-                                && time > time_entries_last_saved.unwrap()
+                        if time_entries_last_saved.is_empty()
+                            || !time_entries_last_saved.is_empty()
+                                && is_later_than(&time, &time_entries_last_saved)
                         {
-                            let time_utc = DateTime::<Utc>::from_utc(
-                                chrono::NaiveDateTime::from_timestamp(time, 0),
-                                Utc,
-                            );
+          
                             let text = format!(
-                                "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time_utc}"
+                                "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
                             );
                             send_message_to_channel("ik8", "ch_mid", text);
 
@@ -86,7 +83,8 @@ fn callback(_body: Vec<u8>) {
                                 "Created": time,
                             });
                             create_record(account, base_id, table_name, data.clone());
-                            let time_value = serde_json::json!(time);
+                            
+                            let time_value: Value = serde_json::json!(time);
                             global_set("time_entries_last_saved", time_value);
                             send_message_to_channel("ik8", "ch_out", data.to_string());
                         }
@@ -109,10 +107,21 @@ struct Issue {
     html_url: String,
     title: String,
     user: User,
-    created_at: i64,
+    created_at: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct User {
     login: String,
+}
+
+pub fn is_later_than(dt_one: &str, dt_two: &str) -> bool {
+    let dt1 = DateTime::parse_from_rfc3339(dt_one)
+        .unwrap()
+        .with_timezone(&Utc);
+    let dt2 = DateTime::parse_from_rfc3339(dt_two)
+        .unwrap()
+        .with_timezone(&Utc);
+
+    dt1 > dt2
 }
