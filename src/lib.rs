@@ -1,5 +1,4 @@
 use airtable_flows::create_record;
-use chrono::{DateTime, Utc};
 use dotenv::dotenv;
 use http_req::{
     request::{Method, Request},
@@ -15,7 +14,7 @@ use store_flows::{global_get, global_set};
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("33 * * * *"),
+        String::from("01 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -44,6 +43,9 @@ fn callback(_body: Vec<u8>) {
 
     let query_string = serde_urlencoded::to_string(&query_params).unwrap();
     let url_str = format!("https://api.github.com/search/issues?{}", query_string);
+
+    send_message_to_channel("ik8", "ch_in", url_str.to_string());
+
     let url = Uri::try_from(url_str.as_str()).unwrap();
 
     match Request::new(&url)
@@ -61,19 +63,11 @@ fn callback(_body: Vec<u8>) {
             match response {
                 Err(_e) => {
                     send_message_to_channel("ik8", "ch_err", _e.to_string());
-
                 }
 
                 Ok(search_result) => {
-                    let time_entries_last_saved: Option<DateTime<Utc>> =
-                        match global_get("time_entries_last_saved")
-                            .unwrap()
-                            .to_string()
-                            .parse()
-                        {
-                            Ok(t) => Some(t),
-                            Err(_) => None,
-                        };
+                    let time_entries_last_saved =
+                        global_get("time_entries_last_saved").unwrap().as_i64();
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
@@ -96,9 +90,8 @@ fn callback(_body: Vec<u8>) {
                                 "Created": time,
                             });
                             create_record(account, base_id, table_name, data.clone());
-                            let time_serialized: Value =
-                                serde_json::to_value(&time).expect("Failed to serialize date-time");
-                            global_set("time_entries_last_saved", time_serialized);
+                            let time_value = serde_json::json!(time);
+                            global_set("time_entries_last_saved", time_value);
                             send_message_to_channel("ik8", "ch_out", data.to_string());
                         }
                         send_message_to_channel("ik8", "ch_mid", time.to_string());
@@ -120,7 +113,7 @@ struct Issue {
     html_url: String,
     title: String,
     user: User,
-    created_at: DateTime<Utc>,
+    created_at: i64,
 }
 
 #[derive(Debug, Deserialize)]
