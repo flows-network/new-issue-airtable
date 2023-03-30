@@ -1,5 +1,5 @@
 use airtable_flows::create_record;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, Utc, Datelike};
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -12,7 +12,7 @@ use slack_flows::send_message_to_channel;
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("13 * * * *"),
+        String::from("24 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -44,12 +44,10 @@ fn callback(_body: Vec<u8>) {
         .send(&mut writer)
     {
         Ok(res) => {
-            if !res.status_code().is_success() {
-            }
+            if !res.status_code().is_success() {}
             let response: Result<SearchResult, _> = serde_json::from_slice(&writer);
             match response {
-                Err(_e) => {
-                }
+                Err(_e) => {}
 
                 Ok(search_result) => {
                     let now = Utc::now();
@@ -59,14 +57,12 @@ fn callback(_body: Vec<u8>) {
                         let title = item.title;
                         let html_url = item.html_url;
                         let time = item.created_at;
+                        let parsed = DateTime::parse_from_rfc3339(&time).unwrap();
 
-                        let utc_time = DateTime::parse_from_rfc3339(&time).unwrap_or_default();
-
-                        // if utc_time > one_hour_ago {
+                        if parsed.day() == 30 {
                             let text = format!(
                                 "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
                             );
-                            send_message_to_channel("ik8", "ch_mid", text);
 
                             let data = serde_json::json!({
                                 "Name": name,
@@ -76,13 +72,12 @@ fn callback(_body: Vec<u8>) {
                             create_record(account, base_id, table_name, data.clone());
 
                             send_message_to_channel("ik8", "ch_out", data.to_string());
-                        // }
+                        }
                     }
                 }
             }
         }
-        Err(_e) => {
-        }
+        Err(_e) => {}
     }
 }
 
