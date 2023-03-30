@@ -14,7 +14,7 @@ use std::env;
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("26 * * * *"),
+        String::from("36 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -60,7 +60,7 @@ fn callback(_body: Vec<u8>) {
 
                 Ok(search_result) => {
                     let now = Utc::now();
-                    let one_hour_ago = now - Duration::minutes(1440);
+                    let one_hour_ago = now - Duration::minutes(2880);
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
