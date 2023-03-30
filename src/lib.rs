@@ -15,7 +15,7 @@ use store_flows::{global_get, global_set};
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("13 * * * *"),
+        String::from("33 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
