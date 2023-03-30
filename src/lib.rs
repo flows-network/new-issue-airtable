@@ -1,6 +1,5 @@
 use airtable_flows::create_record;
 use chrono::{DateTime, Duration, Utc};
-use dotenv::dotenv;
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -9,27 +8,22 @@ use schedule_flows::schedule_cron_job;
 use serde::Deserialize;
 use serde_json::Value;
 use slack_flows::send_message_to_channel;
-use std::env;
 
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("36 * * * *"),
+        String::from("13 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
 }
 
 fn callback(_body: Vec<u8>) {
-    dotenv().ok();
-    let github_token: String =
-        env::var("github_token").unwrap_or("GitHub token not found".to_string());
     let account: &str = "jaykchen";
     let base_id: &str = "apptJFYvsGrrywvWh";
     let table_name: &str = "users";
 
     let search_key_word = "GitHub WASMEDGE";
-    let bearer_token = format!("bearer {}", github_token);
     let mut writer = Vec::new();
 
     let query_params: Value = serde_json::json!({
@@ -45,7 +39,6 @@ fn callback(_body: Vec<u8>) {
 
     match Request::new(&url)
         .method(Method::GET)
-        .header("Authorization", &bearer_token)
         .header("User-Agent", "flows-network connector")
         .header("Content-Type", "application/vnd.github.v3+json")
         .send(&mut writer)
@@ -69,7 +62,7 @@ fn callback(_body: Vec<u8>) {
 
                         let utc_time = DateTime::parse_from_rfc3339(&time).unwrap_or_default();
 
-                        if utc_time > one_hour_ago {
+                        // if utc_time > one_hour_ago {
                             let text = format!(
                                 "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
                             );
@@ -83,7 +76,7 @@ fn callback(_body: Vec<u8>) {
                             create_record(account, base_id, table_name, data.clone());
 
                             send_message_to_channel("ik8", "ch_out", data.to_string());
-                        }
+                        // }
                     }
                 }
             }
