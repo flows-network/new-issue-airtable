@@ -63,9 +63,9 @@ fn callback(_body: Vec<u8>) {
                 }
 
                 Ok(search_result) => {
-                    let time_entries_last_saved = get("time_entries_last_saved")
-                        .unwrap_or_default()
-                        .to_string();
+                    // let time_entries_last_saved = get("time_entries_last_saved")
+                    //     .unwrap_or_default()
+                    //     .to_string();
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
@@ -73,10 +73,10 @@ fn callback(_body: Vec<u8>) {
                         let html_url = item.html_url;
                         let time = item.created_at;
 
-                        if time_entries_last_saved.is_empty()
-                            || !time_entries_last_saved.is_empty()
-                                && is_later_than(&time, &time_entries_last_saved)
-                        {
+                        // if time_entries_last_saved.is_empty()
+                        //     || !time_entries_last_saved.is_empty()
+                        //         && is_later_than(&time, &time_entries_last_saved)
+                        // {
                             let text = format!(
                                 "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
                             );
@@ -92,7 +92,7 @@ fn callback(_body: Vec<u8>) {
                             let time_value: Value = serde_json::json!(time);
                             set("time_entries_last_saved", time_value);
                             send_message_to_channel("ik8", "ch_out", data.to_string());
-                        }
+                        // }
                         send_message_to_channel("ik8", "ch_mid", time.to_string());
                     }
                 }
