@@ -1,6 +1,7 @@
 use airtable_flows::create_record;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use dotenv::dotenv;
+use flowsnet_platform_sdk::write_error_log;
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -10,11 +11,10 @@ use serde::Deserialize;
 use serde_json::Value;
 use slack_flows::send_message_to_channel;
 use std::env;
-use store_flows::{get, set};
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("06 * * * *"),
+        String::from("22 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -41,8 +41,6 @@ fn callback(_body: Vec<u8>) {
     let query_string = serde_urlencoded::to_string(&query_params).unwrap();
     let url_str = format!("https://api.github.com/search/issues?{}", query_string);
 
-    send_message_to_channel("ik8", "ch_in", url_str.to_string());
-
     let url = Uri::try_from(url_str.as_str()).unwrap();
 
     match Request::new(&url)
@@ -54,29 +52,26 @@ fn callback(_body: Vec<u8>) {
     {
         Ok(res) => {
             if !res.status_code().is_success() {
-                send_message_to_channel("ik8", "ch_err", res.status_code().to_string());
+                write_error_log!(res.status_code().to_string());
             }
             let response: Result<SearchResult, _> = serde_json::from_slice(&writer);
             match response {
                 Err(_e) => {
-                    send_message_to_channel("ik8", "ch_err", _e.to_string());
+                    write_error_log!(_e.to_string());
                 }
 
                 Ok(search_result) => {
-                    // let time_entries_last_saved = get("time_entries_last_saved")
-                    //     .unwrap_or_default()
-                    //     .to_string();
+                    let now = Utc::now();
+                    let one_hour_ago = now - Duration::minutes(60);
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
-                        send_message_to_channel("ik8", "ch_in", title.to_string());
                         let html_url = item.html_url;
                         let time = item.created_at;
 
-                        // if time_entries_last_saved.is_empty()
-                        //     || !time_entries_last_saved.is_empty()
-                        //         && is_later_than(&time, &time_entries_last_saved)
-                        // {
+                        let utc_time = DateTime::parse_from_rfc3339(&time).unwrap_or_default();
+
+                        if utc_time > one_hour_ago {
                             let text = format!(
                                 "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
                             );
@@ -89,16 +84,15 @@ fn callback(_body: Vec<u8>) {
                             });
                             create_record(account, base_id, table_name, data.clone());
 
-                            let time_value: Value = serde_json::json!(time);
-                            set("time_entries_last_saved", time_value);
                             send_message_to_channel("ik8", "ch_out", data.to_string());
-                        // }
-                        send_message_to_channel("ik8", "ch_mid", time.to_string());
+                        }
                     }
                 }
             }
         }
-        Err(_) => {}
+        Err(_e) => {
+            write_error_log!(_e.to_string());
+        }
     }
 }
 
