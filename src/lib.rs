@@ -1,5 +1,6 @@
 use airtable_flows::create_record;
 use chrono::{DateTime, Utc};
+use dotenv::dotenv;
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -8,24 +9,27 @@ use schedule_flows::schedule_cron_job;
 use serde::Deserialize;
 use serde_json::Value;
 use slack_flows::send_message_to_channel;
-use store_flows::{set, get};
-
+use std::env;
+use store_flows::{get, set};
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("50 * * * *"),
+        String::from("56 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
 }
 
 fn callback(_body: Vec<u8>) {
+    dotenv().ok();
+    let github_token: String =
+        env::var("github_token").unwrap_or("GitHub token not found".to_string());
     let account: &str = "jaykchen";
     let base_id: &str = "apptJFYvsGrrywvWh";
     let table_name: &str = "users";
 
     let search_key_word = "GitHub WASMEDGE";
-
+    let bearer_token = format!("bearer {}", github_token);
     let mut writer = Vec::new();
 
     let query_params: Value = serde_json::json!({
@@ -43,6 +47,7 @@ fn callback(_body: Vec<u8>) {
 
     match Request::new(&url)
         .method(Method::GET)
+        .header("Authorization", &bearer_token)
         .header("User-Agent", "flows-network connector")
         .header("Content-Type", "application/vnd.github.v3+json")
         .send(&mut writer)
@@ -59,7 +64,8 @@ fn callback(_body: Vec<u8>) {
 
                 Ok(search_result) => {
                     let time_entries_last_saved = get("time_entries_last_saved")
-                        .unwrap_or_default().to_string();
+                        .unwrap_or_default()
+                        .to_string();
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
@@ -71,7 +77,6 @@ fn callback(_body: Vec<u8>) {
                             || !time_entries_last_saved.is_empty()
                                 && is_later_than(&time, &time_entries_last_saved)
                         {
-          
                             let text = format!(
                                 "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
                             );
@@ -83,7 +88,7 @@ fn callback(_body: Vec<u8>) {
                                 "Created": time,
                             });
                             create_record(account, base_id, table_name, data.clone());
-                            
+
                             let time_value: Value = serde_json::json!(time);
                             set("time_entries_last_saved", time_value);
                             send_message_to_channel("ik8", "ch_out", data.to_string());
