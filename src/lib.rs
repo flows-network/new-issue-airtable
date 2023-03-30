@@ -1,7 +1,6 @@
 use airtable_flows::create_record;
 use chrono::{DateTime, Duration, Utc};
 use dotenv::dotenv;
-use flowsnet_platform_sdk::write_error_log;
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -15,7 +14,7 @@ use std::env;
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("24 * * * *"),
+        String::from("26 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -53,12 +52,10 @@ fn callback(_body: Vec<u8>) {
     {
         Ok(res) => {
             if !res.status_code().is_success() {
-                write_error_log!(res.status_code().to_string());
             }
             let response: Result<SearchResult, _> = serde_json::from_slice(&writer);
             match response {
                 Err(_e) => {
-                    write_error_log!(_e.to_string());
                 }
 
                 Ok(search_result) => {
@@ -92,7 +89,6 @@ fn callback(_body: Vec<u8>) {
             }
         }
         Err(_e) => {
-            write_error_log!(_e.to_string());
         }
     }
 }
