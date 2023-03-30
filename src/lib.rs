@@ -1,5 +1,5 @@
 use airtable_flows::create_record;
-use chrono::{DateTime, Duration, Utc, Datelike};
+use chrono::{DateTime, Datelike, Duration, Utc};
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -12,7 +12,7 @@ use slack_flows::send_message_to_channel;
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("24 * * * *"),
+        String::from("36 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
@@ -51,18 +51,19 @@ fn callback(_body: Vec<u8>) {
 
                 Ok(search_result) => {
                     let now = Utc::now();
-                    let one_hour_ago = now - Duration::minutes(2880);
+                    // let one_hour_ago = now - Duration::minutes(60);
+                    let one_day_earlier = now - Duration::minutes(1440);
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
                         let html_url = item.html_url;
                         let time = item.created_at;
-                        let parsed = DateTime::parse_from_rfc3339(&time).unwrap();
+                        let parsed = DateTime::parse_from_rfc3339(&time).unwrap_or_default();
 
-                        if parsed.day() == 30 {
-                            let text = format!(
-                                "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
-                            );
+                        if parsed > one_day_earlier {
+                            // let text = format!(
+                            //     "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
+                            // );
 
                             let data = serde_json::json!({
                                 "Name": name,
@@ -97,15 +98,4 @@ struct Issue {
 #[derive(Debug, Deserialize)]
 struct User {
     login: String,
-}
-
-pub fn is_later_than(dt_one: &str, dt_two: &str) -> bool {
-    let dt1 = DateTime::parse_from_rfc3339(dt_one)
-        .unwrap()
-        .with_timezone(&Utc);
-    let dt2 = DateTime::parse_from_rfc3339(dt_two)
-        .unwrap()
-        .with_timezone(&Utc);
-
-    dt1 > dt2
 }

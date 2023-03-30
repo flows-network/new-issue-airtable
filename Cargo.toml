@@ -11,7 +11,6 @@ crate-type = ["cdylib"]
 [dependencies]
 airtable-flows = "0.1.9"
 chrono = "0.4.24"
-dotenv = "0.15.0"
 flowsnet-platform-sdk = "0.1.1"
 http_req_wasi = "0.10.2"
 schedule-flows = "0.1.10"
@@ -19,4 +18,3 @@ serde = {version ="1.0.159", features = ["derive"]}
 serde_json = "1.0.93"
 serde_urlencoded = "0.7.1"
 slack-flows = "0.2.6"
-store-flows = "0.2.1"
