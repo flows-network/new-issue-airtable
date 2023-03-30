@@ -60,7 +60,7 @@ fn callback(_body: Vec<u8>) {
 
                 Ok(search_result) => {
                     let now = Utc::now();
-                    let one_hour_ago = now - Duration::minutes(60);
+                    let one_hour_ago = now - Duration::minutes(1440);
                     for item in search_result.items {
                         let name = item.user.login;
                         let title = item.title;
