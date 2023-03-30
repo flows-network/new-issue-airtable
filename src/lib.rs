@@ -11,10 +11,11 @@ use serde::Deserialize;
 use serde_json::Value;
 use slack_flows::send_message_to_channel;
 use std::env;
+
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("22 * * * *"),
+        String::from("24 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
