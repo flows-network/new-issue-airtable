@@ -1,5 +1,5 @@
 use airtable_flows::create_record;
-use dotenv::dotenv;
+use chrono::{DateTime, Utc};
 use http_req::{
     request::{Method, Request},
     uri::Uri,
@@ -8,30 +8,23 @@ use schedule_flows::schedule_cron_job;
 use serde::Deserialize;
 use serde_json::Value;
 use slack_flows::send_message_to_channel;
-use std::env;
 use store_flows::{global_get, global_set};
 
 #[no_mangle]
 pub fn run() {
     schedule_cron_job(
-        String::from("01 * * * *"),
+        String::from("12 * * * *"),
         String::from("cron_job_evoked"),
         callback,
     );
 }
 
 fn callback(_body: Vec<u8>) {
-    dotenv().ok();
-
-    let github_token: String =
-        env::var("github_token").unwrap_or("GitHub token not found".to_string());
     let account: &str = "jaykchen";
     let base_id: &str = "apptJFYvsGrrywvWh";
     let table_name: &str = "users";
 
     let search_key_word = "GitHub WASMEDGE";
-
-    let bearer_token = format!("bearer {}", github_token);
 
     let mut writer = Vec::new();
 
@@ -50,7 +43,6 @@ fn callback(_body: Vec<u8>) {
 
     match Request::new(&url)
         .method(Method::GET)
-        .header("Authorization", &bearer_token)
         .header("User-Agent", "flows-network connector")
         .header("Content-Type", "application/vnd.github.v3+json")
         .send(&mut writer)
@@ -79,8 +71,12 @@ fn callback(_body: Vec<u8>) {
                             || time_entries_last_saved.is_some()
                                 && time > time_entries_last_saved.unwrap()
                         {
+                            let time_utc = DateTime::<Utc>::from_utc(
+                                chrono::NaiveDateTime::from_timestamp(time, 0),
+                                Utc,
+                            );
                             let text = format!(
-                                "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
+                                "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time_utc}"
                             );
                             send_message_to_channel("ik8", "ch_mid", text);
 
