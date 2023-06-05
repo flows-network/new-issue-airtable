@@ -1,101 +1,69 @@
 use airtable_flows::create_record;
-use chrono::{DateTime, Datelike, Duration, Utc};
-use http_req::{
-    request::{Method, Request},
-    uri::Uri,
-};
+use chrono::{Duration, Utc};
+use dotenv::dotenv;
+use github_flows::{get_octo, GithubLogin::Default};
 use schedule_flows::schedule_cron_job;
-use serde::Deserialize;
-use serde_json::Value;
 use slack_flows::send_message_to_channel;
+use std::env;
+use tokio;
 
 #[no_mangle]
 pub fn run() {
-    schedule_cron_job(
-        String::from("36 * * * *"),
-        String::from("cron_job_evoked"),
-        callback,
+    dotenv().ok();
+    //time_to_invoke is a string of 3 numbers separated by spaces, representing minute, hour, and day
+    //* is the spaceholder for non-specified numbers
+    let mut time_to_invoke = env::var("time_to_invoke").unwrap_or("* 12 *".to_string());
+    time_to_invoke.push_str(" * *");
+
+    schedule_cron_job(time_to_invoke, String::from("cron_job_evoked"), callback);
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn callback(_body: Vec<u8>) {
+    let github_owner = env::var("github_owner").unwrap_or("WASMEDGE".to_string());
+    let github_repo = env::var("github_repo").unwrap_or("WASMEDGE".to_string());
+    let airtable_token_name = env::var("airtable_token_name").unwrap_or("a-test".to_string());
+    let airtable_base_id = env::var("airtable_base_id").unwrap_or("apptJFYvsGrrywvWh".to_string());
+    let airtable_table_name = env::var("airtable_table_name").unwrap_or("users".to_string());
+
+    let n_days = env::var("n_days").unwrap_or("1".to_string());
+
+    let n_days_ago_formatted = Utc::now()
+        .checked_sub_signed(Duration::days(n_days.parse::<i64>().unwrap_or(1)))
+        .unwrap_or(Utc::now())
+        .date_naive();
+    let query = format!(
+        "repo:{github_owner}/{github_repo} is:issue state:open comments:0 updated:>{n_days_ago_formatted}"
     );
-}
 
-fn callback(_body: Vec<u8>) {
-    let account: &str = "jaykchen";
-    let base_id: &str = "apptJFYvsGrrywvWh";
-    let table_name: &str = "users";
+    let octocrab = get_octo(&Default);
 
-    let search_key_word = "GitHub WASMEDGE";
-    let mut writer = Vec::new();
+    let res = octocrab
+        .search()
+        .issues_and_pull_requests(&query)
+        .send()
+        .await;
 
-    let query_params: Value = serde_json::json!({
-        "q": search_key_word,
-        "sort": "created",
-        "order": "desc"
-    });
+    if let Ok(page) = res {
+        for item in page {
+            let name = item.user.login;
+            let title = item.title;
+            let html_url = item.html_url;
+            let time = item.created_at;
 
-    let query_string = serde_urlencoded::to_string(&query_params).unwrap();
-    let url_str = format!("https://api.github.com/search/issues?{}", query_string);
+            let data = serde_json::json!({
+                "Name": name,
+                "Repo": html_url,
+                "Created": time,
+            });
+            create_record(
+                &airtable_token_name,
+                &airtable_base_id,
+                &airtable_table_name,
+                data.clone(),
+            );
 
-    let url = Uri::try_from(url_str.as_str()).unwrap();
-
-    match Request::new(&url)
-        .method(Method::GET)
-        .header("User-Agent", "flows-network connector")
-        .header("Content-Type", "application/vnd.github.v3+json")
-        .send(&mut writer)
-    {
-        Ok(res) => {
-            if !res.status_code().is_success() {}
-            let response: Result<SearchResult, _> = serde_json::from_slice(&writer);
-            match response {
-                Err(_e) => {}
-
-                Ok(search_result) => {
-                    let now = Utc::now();
-                    // let one_hour_ago = now - Duration::minutes(60);
-                    let one_day_earlier = now - Duration::minutes(1440);
-                    for item in search_result.items {
-                        let name = item.user.login;
-                        let title = item.title;
-                        let html_url = item.html_url;
-                        let time = item.created_at;
-                        let parsed = DateTime::parse_from_rfc3339(&time).unwrap_or_default();
-
-                        if parsed > one_day_earlier {
-                            // let text = format!(
-                            //     "{name} mentioned WASMEDGE in issue: {title}  @{html_url}\n{time}"
-                            // );
-
-                            let data = serde_json::json!({
-                                "Name": name,
-                                "Repo": html_url,
-                                "Created": time,
-                            });
-                            create_record(account, base_id, table_name, data.clone());
-
-                            send_message_to_channel("ik8", "ch_out", data.to_string());
-                        }
-                    }
-                }
-            }
+            send_message_to_channel("ik8", "ch_out", data.to_string());
         }
-        Err(_e) => {}
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct SearchResult {
-    items: Vec<Issue>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Issue {
-    html_url: String,
-    title: String,
-    user: User,
-    created_at: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct User {
-    login: String,
 }
