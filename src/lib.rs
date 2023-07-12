@@ -63,7 +63,7 @@ async fn callback(_body: Vec<u8>) {
                 data.clone(),
             );
 
-            send_message_to_channel("ik8", "ch_out", data.to_string());
+            send_message_to_channel("secondstate", "test-flow", data.to_string());
         }
     }
 }
